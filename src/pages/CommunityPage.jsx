@@ -1,17 +1,34 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import clubs from '../data/clubs';
 import ClubCard from '../components/community/ClubCard';
 import ThreadView from '../components/community/ThreadView';
 import ReviewCard from '../components/reviews/ReviewCard';
-import { reviews } from '../data/reviews';
-import { MessageSquare, Users, TrendingUp } from 'lucide-react';
+import { reviews as staticReviews } from '../data/reviews';
+import { MessageSquare, Users, TrendingUp, Loader2 } from 'lucide-react';
+import { useBooks } from '../hooks/useBooks';
 
 const tabs = ['Clubs', 'Discussions', 'Reviews'];
 
 export default function CommunityPage() {
   const [activeTab, setActiveTab] = useState('Clubs');
+  const { allBooks, loading } = useBooks();
 
   const allThreads = clubs.flatMap(c => c.threads.map(t => ({ ...t, clubName: c.name, clubColor: c.color })));
+
+  // Map static reviews to real API books so the feed looks alive
+  const mappedReviews = useMemo(() => {
+    if (!allBooks || allBooks.length === 0) return [];
+    return staticReviews.map((r, i) => {
+      const book = allBooks[i % allBooks.length];
+      return {
+        ...r,
+        bookId: book.id,
+        // Inject book details into review for display context if needed
+        bookTitle: book.title, 
+        bookCover: book.coverUrl,
+      };
+    });
+  }, [allBooks]);
 
   return (
     <div className="page-enter" id="community-page">
@@ -34,7 +51,7 @@ export default function CommunityPage() {
         </div>
         <div className="glass rounded-xl p-4 text-center">
           <TrendingUp size={20} className="mx-auto mb-2 text-neon-pink" />
-          <div className="text-xl font-bold text-white">{reviews.length}</div>
+          <div className="text-xl font-bold text-white">{mappedReviews.length || staticReviews.length}</div>
           <div className="text-[10px] text-gray-500 uppercase">Reviews</div>
         </div>
       </div>
@@ -91,8 +108,20 @@ export default function CommunityPage() {
       {/* Reviews Feed */}
       {activeTab === 'Reviews' && (
         <div className="space-y-3 max-w-2xl">
-          {reviews.map(review => (
-            <ReviewCard key={review.id} review={review} />
+          {loading ? (
+             <div className="flex flex-col items-center justify-center py-20 gap-3 glass rounded-2xl">
+              <Loader2 size={24} className="animate-spin text-neon-blue" />
+              <p className="text-sm text-gray-400">Loading community reviews...</p>
+            </div>
+          ) : mappedReviews.map(review => (
+            <div key={review.id} className="relative">
+              {review.bookTitle && (
+                <div className="text-xs text-gray-500 mb-1 ml-4 mt-2">
+                  Reviewing: <span className="text-neon-blue font-medium">{review.bookTitle}</span>
+                </div>
+              )}
+              <ReviewCard review={review} />
+            </div>
           ))}
         </div>
       )}
